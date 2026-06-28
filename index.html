@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playable 3D Rubik's Cube - Scalable & Realistic</title>
+    <style>
+        :root {
+            --bg-gradient: radial-gradient(circle, #1e272e, #0f141c);
+            --text-color: #ffffff;
+            --overlay-bg: rgba(0, 0, 0, 0.4);
+            --border-color: rgba(255, 255, 255, 0.4);
+            --btn-bg: rgba(255, 255, 255, 0.1);
+            --btn-hover-bg: white;
+            --btn-hover-text: #0f141c;
+            --key-bg: rgba(255, 255, 255, 0.2);
+            --text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            --accent: #ffffff;
+        }
+
+        body.light-mode {
+            --bg-gradient: radial-gradient(circle, #f5f7fa, #c3cfe2);
+            --text-color: #2c3e50;
+            --overlay-bg: rgba(255, 255, 255, 0.6);
+            --border-color: rgba(0, 0, 0, 0.2);
+            --btn-bg: rgba(0, 0, 0, 0.05);
+            --btn-hover-bg: #2c3e50;
+            --btn-hover-text: white;
+            --key-bg: rgba(0, 0, 0, 0.1);
+            --text-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            --accent: #2c3e50;
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            background: var(--bg-gradient);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            transition: background 0.5s ease;
+        }
+
+        #stats-hud {
+            position: absolute;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+            z-index: 20;
+            color: var(--text-color);
+        }
+
+        #timer {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 42px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-shadow: var(--text-shadow);
+            transition: color 0.3s ease;
+            line-height: 1.1;
+        }
+
+        #sub-stats {
+            display: flex;
+            gap: 18px;
+            margin-top: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            opacity: 0.85;
+            text-shadow: var(--text-shadow);
+        }
+
+        #controls-help {
+            position: absolute; top: 50%; left: 20px; transform: translateY(-50%);
+            color: var(--text-color); font-size: 15px; pointer-events: none; z-index: 20;
+            line-height: 1.8; background: var(--overlay-bg); padding: 20px;
+            border-radius: 12px; border: 1px solid var(--border-color);
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .key-btn {
+            background: var(--key-bg); padding: 3px 8px; border-radius: 4px;
+            color: var(--text-color); font-weight: bold; display: inline-block;
+            min-width: 15px; text-align: center;
+        }
+
+        #ui-container {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 15px; z-index: 10;
+        }
+
+        #top-controls {
+            position: absolute; top: 20px; right: 20px; z-index: 30;
+            display: flex; gap: 10px; align-items: center;
+        }
+
+        button {
+            background: var(--btn-bg); color: var(--text-color);
+            border: 2px solid var(--border-color); padding: 12px 24px;
+            font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer;
+            backdrop-filter: blur(5px); transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); outline: none;
+            text-transform: uppercase;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--btn-hover-bg); color: var(--btn-hover-text); transform: translateY(-2px);
+        }
+
+        button:disabled { opacity: 0.4; cursor: not-allowed; transform: none;}
+
+        #size-switch {
+            display: flex;
+            background: var(--btn-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 25px;
+            padding: 4px;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #size-switch .size-option {
+            position: relative;
+            z-index: 2;
+            border: none;
+            background: transparent;
+            color: var(--text-color);
+            font-weight: bold;
+            font-size: 14px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: color 0.3s ease;
+            text-transform: uppercase;
+            box-shadow: none;
+        }
+
+        #size-switch .size-option:hover:not(:disabled):not(.active) {
+            background: transparent;
+            color: var(--text-color);
+            transform: none;
+            opacity: 0.7;
+        }
+
+        #size-switch .size-option.active {
+            color: var(--btn-hover-text);
+        }
+
+        #size-switch .size-option:disabled {
+            cursor: not-allowed;
+        }
+
+        #size-switch .slider {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            height: calc(100% - 8px);
+            width: calc(25% - 4px);
+            background: var(--btn-hover-bg);
+            border-radius: 20px;
+            z-index: 1;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        #win-message {
+            position: absolute; top: 130px; width: 100%; text-align: center;
+            color: #2ecc71; font-size: 32px; font-weight: bold; opacity: 0;
+            transition: opacity 0.5s; pointer-events: none;
+            text-shadow: var(--text-shadow); letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="top-controls">
+        <div id="size-switch">
+            <div class="slider" id="size-slider"></div>
+            <button class="size-option active" data-size="2">2x2</button>
+            <button class="size-option" data-size="3">3x3</button>
+            <button class="size-option" data-size="4">4x4</button>
+            <button class="size-option" data-size="5">5x5</button>
+        </div>
+        <button id="theme-btn">☀️ Light Mode</button>
+    </div>
+
+    <div id="stats-hud">
+        <div id="timer">00:00.00</div>
+        <div id="sub-stats">
+            <span id="move-counter">Moves : 0</span>
+            <span id="tps-counter">TPS : 0.0</span>
+        </div>
+    </div>
+    
+    <div id="win-message">CUBE SOLVED!</div>
+    
+    <div id="controls-help">
+        <b>Mouse:</b> Left Click + Drag<br><br>
+        <b>Keyboard Controls:</b><br>
+        <span class="key-btn">R</span> Right Layer<br>
+        <span class="key-btn">L</span> Left Layer<br>
+        <span class="key-btn">U</span> Up Layer<br>
+        <span class="key-btn">D</span> Down Layer<br>
+        <span class="key-btn">F</span> Front Layer<br>
+        <span class="key-btn">B</span> Back Layer<br><br>
+        <i>Hold <span class="key-btn">SHIFT</span> to reverse direction</i>
+    </div>
+
+    <div id="ui-container">
+        <button id="shuffle-btn">Shuffle</button>
+        <button id="solve-btn">Auto-Solve</button>
+    </div>
+
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        const SoundEngine = {
+            playTone: function(frequency, type, duration, volume) {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            },
+            twist: () => {
+                SoundEngine.playTone(150, 'triangle', 0.1, 0.4);
+                setTimeout(() => SoundEngine.playTone(200, 'square', 0.05, 0.05), 20);
+            },
+            uiClick: () => SoundEngine.playTone(800, 'sine', 0.1, 0.2),
+            victory: () => {
+                setTimeout(() => SoundEngine.playTone(523.25, 'sine', 0.4, 0.3), 0);   
+                setTimeout(() => SoundEngine.playTone(659.25, 'sine', 0.4, 0.3), 150); 
+                setTimeout(() => SoundEngine.playTone(783.99, 'sine', 0.4, 0.3), 300); 
+                setTimeout(() => SoundEngine.playTone(1046.50, 'sine', 0.8, 0.4), 450); 
+            }
+        };
+
+        const themeBtn = document.getElementById('theme-btn');
+        themeBtn.addEventListener('click', () => {
+            SoundEngine.uiClick(); 
+            document.body.classList.toggle('light-mode');
+            themeBtn.innerText = document.body.classList.contains('light-mode') ? '🌙 Dark Mode' : '☀️ Light Mode';
+            if (!isTimerRunning && !winMessage.style.opacity > 0) {
+                timerDisplay.style.color = "inherit";
+            }
+        });
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 3;
+        controls.maxDistance = 25;
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(5, 10, 7);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.left = -8;
+        dirLight.shadow.camera.right = 8;
+        dirLight.shadow.camera.top = 8;
+        dirLight.shadow.camera.bottom = -8;
+        scene.add(dirLight);
+
+        const pointLight = new THREE.PointLight(0xffffff, 0.8);
+        camera.add(pointLight); 
+        scene.add(camera);
+
+        const floorGeo = new THREE.PlaneGeometry(50, 50);
+        const floorMat = new THREE.ShadowMaterial({ opacity: 0.4 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        const cubeGroup = new THREE.Group();
+        scene.add(cubeGroup);
+        
+        let cublets = [];
+        let moves = [];
+        const pivot = new THREE.Object3D(); 
+        scene.add(pivot);
+
+        const faceColors = [0xdf1c1c, 0xe66e19, 0xfbfbfc, 0xf1d223, 0x1fa12e, 0x0f47a1]; 
+        const baseGeo = new THREE.BoxGeometry(0.92, 0.92, 0.92);
+        const baseMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.8, metalness: 0.1 });
+        const stickerGeo = new THREE.BoxGeometry(0.82, 0.82, 0.04);
+
+        function generateCube(size) {
+            while(cubeGroup.children.length > 0) {
+                cubeGroup.remove(cubeGroup.children[0]);
+            }
+            cublets = [];
+
+            camera.position.set(size * 2, size * 2, size * 2.5);
+            const maxCoord = (size - 1) / 2;
+            floor.position.y = -(maxCoord + 1.5);
+
+            for (let x = 0; x < size; x++) {
+                for (let y = 0; y < size; y++) {
+                    for (let z = 0; z < size; z++) {
+                        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
+
+                        const px = x - maxCoord;
+                        const py = y - maxCoord;
+                        const pz = z - maxCoord;
+
+                        const cubletGroup = new THREE.Group();
+                        
+                        const core = new THREE.Mesh(baseGeo, baseMat);
+                        core.castShadow = true;
+                        core.receiveShadow = true;
+                        cubletGroup.add(core);
+
+                        const addSticker = (colorHex, dx, dy, dz, rx, ry, rz) => {
+                            const stickerMat = new THREE.MeshPhysicalMaterial({
+                                color: colorHex, metalness: 0.1, roughness: 0.2,
+                                clearcoat: 1.0, clearcoatRoughness: 0.1 
+                            });
+                            const sticker = new THREE.Mesh(stickerGeo, stickerMat);
+                            sticker.position.set(dx, dy, dz);
+                            sticker.rotation.set(rx, ry, rz);
+                            sticker.castShadow = true;
+                            sticker.receiveShadow = true;
+                            cubletGroup.add(sticker);
+                        };
+
+                        const offset = 0.47; 
+                        if (x === size - 1) addSticker(faceColors[0], offset, 0, 0, 0, Math.PI/2, 0);
+                        if (x === 0)        addSticker(faceColors[1], -offset, 0, 0, 0, -Math.PI/2, 0);
+                        if (y === size - 1) addSticker(faceColors[2], 0, offset, 0, -Math.PI/2, 0, 0);
+                        if (y === 0)        addSticker(faceColors[3], 0, -offset, 0, Math.PI/2, 0, 0);
+                        if (z === size - 1) addSticker(faceColors[4], 0, 0, offset, 0, 0, 0);
+                        if (z === 0)        addSticker(faceColors[5], 0, 0, -offset, 0, Math.PI, 0);
+
+                        cubletGroup.position.set(px, py, pz);
+                        cubeGroup.add(cubletGroup);
+                        cublets.push(cubletGroup);
+                    }
+                }
+            }
+
+            moves = [
+                { axis: 'x', layer: maxCoord,  angle: Math.PI / 2,  name: "r"  },
+                { axis: 'x', layer: -maxCoord, angle: Math.PI / 2,  name: "l"  },
+                { axis: 'y', layer: maxCoord,  angle: Math.PI / 2,  name: "u"  },
+                { axis: 'y', layer: -maxCoord, angle: Math.PI / 2,  name: "d"  },
+                { axis: 'z', layer: maxCoord,  angle: Math.PI / 2,  name: "f"  },
+                { axis: 'z', layer: -maxCoord, angle: Math.PI / 2,  name: "b"  }
+            ];
+        }
+
+        generateCube(2);
+
+        const sizeOptions = Array.from(document.querySelectorAll('.size-option'));
+        const sizeSlider = document.getElementById('size-slider');
+
+        function moveSliderTo(index) {
+            sizeSlider.style.transform = `translateX(${index * 100}%)`;
+        }
+
+        function setActiveSize(button) {
+            sizeOptions.forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+            moveSliderTo(sizeOptions.indexOf(button));
+        }
+
+        sizeOptions.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (isAnimating) return;
+                if (btn.classList.contains('active')) return;
+                SoundEngine.uiClick();
+                setActiveSize(btn);
+                const newSize = parseInt(btn.dataset.size);
+                resetTimer();
+                moveHistory = [];
+                generateCube(newSize);
+                cubeReadyToPlay = false;
+            });
+        });
+
+        function setSizeSwitchDisabled(disabled) {
+            sizeOptions.forEach(b => b.disabled = disabled);
+        }
+
+        let timerInterval = null;
+        let timeElapsed = 0;
+        let isTimerRunning = false;
+        let cubeReadyToPlay = false; 
+        let playerMoves = 0;
+
+        const timerDisplay = document.getElementById('timer');
+        const moveDisplay = document.getElementById('move-counter');
+        const tpsDisplay = document.getElementById('tps-counter');
+        const winMessage = document.getElementById('win-message');
+
+        function formatTime(ms) {
+            let m = Math.floor(ms / 60000).toString().padStart(2, '0');
+            let s = Math.floor((ms % 60000) / 1000).toString().padStart(2, '0');
+            let cs = Math.floor((ms % 1000) / 10).toString().padStart(2, '0');
+            return `${m}:${s}.${cs}`;
+        }
+
+        function startTimer() {
+            if (isTimerRunning) return;
+            isTimerRunning = true;
+            winMessage.style.opacity = 0;
+            let startTime = Date.now() - timeElapsed;
+            timerDisplay.style.color = "#d35400"; 
+            
+            timerInterval = setInterval(() => {
+                timeElapsed = Date.now() - startTime;
+                timerDisplay.innerText = formatTime(timeElapsed);
+
+                if (timeElapsed > 0) {
+                    let tps = (playerMoves / (timeElapsed / 1000)).toFixed(1);
+                    tpsDisplay.innerText = "TPS : " + tps;
+                }
+            }, 10);
+        }
+
+        function stopTimer(isWin = false) {
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            if(isWin) {
+                timerDisplay.style.color = "#2ecc71"; 
+                winMessage.style.opacity = 1;
+            } else {
+                timerDisplay.style.color = "inherit";
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            timeElapsed = 0;
+            playerMoves = 0;
+            timerDisplay.innerText = "00:00.00";
+            moveDisplay.innerText = "Moves : 0";
+            tpsDisplay.innerText = "TPS : 0.0";
+            timerDisplay.style.color = "inherit";
+            winMessage.style.opacity = 0;
+        }
+
+        function checkWinCondition() {
+            if (!cubeReadyToPlay) return false;
+            if (moveHistory.length === 0) {
+                stopTimer(true);
+                cubeReadyToPlay = false; 
+                SoundEngine.victory();
+            }
+        }
+
+        let isAnimating = false;
+        let moveHistory = []; 
+
+        function executeMove(move, isReversal = false, duration = 300) {
+            return new Promise((resolve) => {
+                SoundEngine.twist();
+
+                pivot.rotation.set(0, 0, 0);
+                pivot.position.set(0, 0, 0);
+                pivot.updateMatrixWorld();
+
+                const finalAngle = isReversal ? -move.angle : move.angle;
+                const targetVec = new THREE.Vector3();
+                
+                const targets = cublets.filter(c => Math.abs(c.getWorldPosition(targetVec)[move.axis] - move.layer) < 0.1);
+                targets.forEach(t => pivot.attach(t));
+
+                const startTime = performance.now();
+
+                function animateTwist(currentTime) {
+                    const progress = Math.min((currentTime - startTime) / duration, 1);
+                    const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                    
+                    pivot.rotation[move.axis] = finalAngle * ease;
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animateTwist);
+                    } else {
+                        pivot.updateMatrixWorld();
+                        while(pivot.children.length > 0) cubeGroup.attach(pivot.children[0]);
+                        resolve();
+                    }
+                }
+                requestAnimationFrame(animateTwist);
+            });
+        }
+
+        async function handleMoveQueue(move, isReversal = false, duration = 150) {
+            if (isAnimating) return;
+            isAnimating = true;
+
+            if (cubeReadyToPlay) {
+                playerMoves++;
+                moveDisplay.innerText = "Moves : " + playerMoves;
+            }
+
+            await executeMove(move, isReversal, duration);
+
+            if (!cubeReadyToPlay) {
+                // Shuffling
+            } else {
+                if (!isReversal) {
+                    if (moveHistory.length > 0) {
+                        let last = moveHistory[moveHistory.length - 1];
+                        if (last.name === move.name && last.dir !== move.dir) {
+                            moveHistory.pop();
+                        } else {
+                            moveHistory.push(move);
+                        }
+                    } else {
+                        moveHistory.push(move);
+                    }
+                }
+            }
+
+            isAnimating = false;
+            checkWinCondition();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (isAnimating || !cubeReadyToPlay) return;
+            
+            const key = e.key.toLowerCase();
+            const moveData = moves.find(m => m.name === key);
+            
+            if (moveData) {
+                if (!isTimerRunning) startTimer();
+                const playMove = {...moveData, dir: e.shiftKey ? 'rev' : 'fwd'};
+                handleMoveQueue(playMove, e.shiftKey, 150); 
+            }
+        });
+
+        async function shuffleCube(steps = 20) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            SoundEngine.uiClick(); 
+            updateButtons(true);
+            cubeReadyToPlay = false;
+            resetTimer(); 
+            moveHistory = []; 
+            
+            for (let i = 0; i < steps; i++) {
+                const randomMove = moves[Math.floor(Math.random() * moves.length)];
+                const isReverse = Math.random() > 0.5;
+                const finalMove = {...randomMove, dir: isReverse ? 'rev' : 'fwd'};
+                
+                moveHistory.push(finalMove);
+                
+                isAnimating = true;
+                await executeMove(finalMove, isReverse, 150);
+                isAnimating = false;
+                
+                await new Promise(resolve => setTimeout(resolve, 20));
+            }
+            
+            cubeReadyToPlay = true; 
+            updateButtons(false);
+        }
+
+        async function solveCube() {
+            if (moveHistory.length === 0) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            SoundEngine.uiClick();
+            updateButtons(true);
+            stopTimer(false); 
+
+            while (moveHistory.length > 0) {
+                const lastMove = moveHistory.pop();
+                const isReversal = lastMove.dir === 'fwd'; 
+                isAnimating = true;
+                await executeMove(lastMove, isReversal, 150);
+                isAnimating = false;
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            cubeReadyToPlay = false;
+            updateButtons(false);
+            stopTimer(true); 
+            SoundEngine.victory(); 
+        }
+
+        function updateButtons(disabledState) {
+            document.getElementById('shuffle-btn').disabled = disabledState;
+            document.getElementById('solve-btn').disabled = disabledState;
+            setSizeSwitchDisabled(disabledState);
+        }
+
+        document.getElementById('shuffle-btn').addEventListener('click', () => shuffleCube(15));
+        document.getElementById('solve-btn').addEventListener('click', solveCube);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function tick() {
+            requestAnimationFrame(tick);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        tick();
+    </script>
+</body>
+</html>
